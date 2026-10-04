@@ -61,7 +61,7 @@ jobs:
       - name: checkout
         uses: actions/checkout@v7
         with:
-          ref: ${{ github.event.workflow_run.head_sha }}
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
           persist-credentials: false
 
       - name: set up Docker Buildx
@@ -95,9 +95,9 @@ jobs:
             SKIP_BACKEND_TEST=true
             SKIP_FRONTEND_TEST=true
             CI=github
-            GITHUB_SHA=${{ github.event.workflow_run.head_sha }}
-            GIT_BRANCH=${{ github.event.workflow_run.head_branch }}
-            GITHUB_REF=refs/heads/${{ github.event.workflow_run.head_branch }}
+            GITHUB_SHA=${{ github.event.workflow_run.head_sha || github.sha }}
+            GIT_BRANCH=${{ github.event.workflow_run.head_branch || github.ref_name }}
+            GITHUB_REF=refs/heads/${{ github.event.workflow_run.head_branch || github.ref_name }}
           outputs: type=image,name=${{ env.ACR_LOGIN_SERVER }}/remark42,push-by-digest=true,name-canonical=true,push=true
 
       - name: export digests
@@ -156,16 +156,17 @@ jobs:
       - name: create ACR manifest and push
         working-directory: /tmp/digests/acr
         env:
-          HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
+          HEAD_BRANCH: ${{ github.event.workflow_run.head_branch || github.ref_name }}
         run: |
-          if [[ "$HEAD_BRANCH" == v* ]]; then
+          image_tag="${HEAD_BRANCH//\//-}"
+          if [[ "$image_tag" == v* ]]; then
             docker buildx imagetools create \
-              -t ${ACR_LOGIN_SERVER}/remark42:${HEAD_BRANCH} \
+              -t ${ACR_LOGIN_SERVER}/remark42:${image_tag} \
               -t ${ACR_LOGIN_SERVER}/remark42:latest \
               $(printf "${ACR_LOGIN_SERVER}/remark42@sha256:%s " *)
           else
             docker buildx imagetools create \
-              -t ${ACR_LOGIN_SERVER}/remark42:${HEAD_BRANCH} \
+              -t ${ACR_LOGIN_SERVER}/remark42:${image_tag} \
               $(printf "${ACR_LOGIN_SERVER}/remark42@sha256:%s " *)
           fi
 
